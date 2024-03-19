@@ -4,6 +4,7 @@ import "./globals.css";
 import Image from "next/image";
 import { twMerge } from "tailwind-merge";
 import moment from "moment";
+import Error from "./error";
 
 interface UserActivities {
   account: Account;
@@ -12,7 +13,11 @@ interface UserActivities {
 
 async function getData() {
   const challengId = process.env.CHALLENGE_ID;
-  const token = process.env.TOKEN ?? "";
+  const token = process.env.TOKEN;
+
+  if (!token) {
+    return [];
+  }
 
   const headers = new Headers();
   headers.append("Authorization", token);
@@ -25,12 +30,9 @@ async function getData() {
       cache: "no-cache",
     }
   );
-  // The return value is *not* serialized
-  // You can return Date, Map, Set, etc.
 
   if (!res.ok) {
-    // This will activate the closest `error.js` Error Boundary
-    throw new Error("Failed to fetch data");
+    return [];
   }
 
   const data: {
@@ -42,6 +44,10 @@ async function getData() {
 
 export default async function Home() {
   const data = await getData();
+
+  if (!data.length) {
+    return <Error />;
+  }
 
   function groupByWeek(items: Activity[]) {
     const grouped: { [key: string]: Activity[] } = {};
