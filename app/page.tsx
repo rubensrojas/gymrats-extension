@@ -92,6 +92,48 @@ const UserRankTile = ({ user, index }: { user: RankedUser; index: number }) => {
   );
 };
 
+const WeekUserRankTile = ({
+  user,
+  index,
+}: {
+  user: WeeklyRankedUser;
+  index: number;
+}) => {
+  const isWinner = index === 0;
+
+  return (
+    <div key={user.account.id} className="flex items-center gap-2">
+      <p className={twMerge(["font-bold", isWinner ? "text-xl" : "text-base"])}>
+        {index + 1} -{" "}
+      </p>
+      <div key={user.account.id} className="flex gap-2 items-center">
+        <Image
+          className={twMerge([
+            "object-cover rounded-full bg-black",
+            isWinner ? "w-[80px] h-[80px]" : "w-[60px] h-[60px]",
+          ])}
+          src={
+            user.account.profile_picture_url ??
+            "https://t4.ftcdn.net/jpg/04/70/29/97/360_F_470299797_UD0eoVMMSUbHCcNJCdv2t8B2g1GVqYgs.jpg"
+          }
+          alt="Profile picture"
+          width={isWinner ? 80 : 60}
+          height={isWinner ? 80 : 60}
+        />
+        <div>
+          <p className="font-bold text-xl">{user.account.full_name}</p>
+          <p className="font-bold">
+            {user.activities.length} atividade
+            {user.activities.length > 1 ? "s" : ""}
+          </p>
+          <p className="text-xs">{user.consectutiveDays} Dias únicos</p>
+          <p className="text-xs">{user.totalDuration} minutos</p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export default async function Home() {
   const data = await getData();
 
@@ -326,11 +368,9 @@ export default async function Home() {
           <div className="flex flex-col gap-2 max-w-sm mx-auto mt-5">
             {Object.values(getOverallUsersPoints(weeklyRanking))
               .sort(orderRanking)
-              .map((user, index) => {
-                return (
-                  <UserRankTile key={user.account.id} {...{ user, index }} />
-                );
-              })}
+              .map((user, index) => (
+                <UserRankTile key={user.account.id} {...{ user, index }} />
+              ))}
           </div>
         </div>
         <div>
@@ -340,11 +380,9 @@ export default async function Home() {
           <div className="flex flex-col gap-2 max-w-sm mx-auto mt-5">
             {Object.values(getOverallUsersPoints(weeklyRanking, 4))
               .sort(orderRanking)
-              .map((user, index) => {
-                return (
-                  <UserRankTile key={user.account.id} {...{ user, index }} />
-                );
-              })}
+              .map((user, index) => (
+                <UserRankTile key={user.account.id} {...{ user, index }} />
+              ))}
           </div>
         </div>
         <div>
@@ -354,11 +392,9 @@ export default async function Home() {
           <div className="flex flex-col gap-2 max-w-sm mx-auto mt-5">
             {Object.values(getOverallUsersPoints(weeklyRanking, 5))
               .sort(orderRanking)
-              .map((user, index) => {
-                return (
-                  <UserRankTile key={user.account.id} {...{ user, index }} />
-                );
-              })}
+              .map((user, index) => (
+                <UserRankTile key={user.account.id} {...{ user, index }} />
+              ))}
           </div>
         </div>
       </div>
@@ -375,81 +411,13 @@ export default async function Home() {
                 </h1>
 
                 <div className="flex flex-col gap-4">
-                  {weeklyRanking[weekKey].map((user, index) => {
-                    const isWinner = index === 0;
-                    return (
-                      <div
-                        key={user.account.id}
-                        className="flex items-center gap-2"
-                      >
-                        <p
-                          className={twMerge([
-                            "font-bold",
-                            isWinner ? "text-xl" : "text-base",
-                          ])}
-                        >
-                          {index + 1} -{" "}
-                        </p>
-                        <div
-                          key={user.account.id}
-                          className="flex gap-2 items-center"
-                        >
-                          <Image
-                            className={twMerge([
-                              "object-cover rounded-full bg-black",
-                              isWinner
-                                ? "w-[80px] h-[80px]"
-                                : "w-[60px] h-[60px]",
-                            ])}
-                            src={
-                              user.account.profile_picture_url ??
-                              "https://t4.ftcdn.net/jpg/04/70/29/97/360_F_470299797_UD0eoVMMSUbHCcNJCdv2t8B2g1GVqYgs.jpg"
-                            }
-                            alt="Profile picture"
-                            width={isWinner ? 80 : 60}
-                            height={isWinner ? 80 : 60}
-                          />
-                          <div>
-                            <p className="font-bold text-xl">
-                              {user.account.full_name}
-                            </p>
-                            <p className="font-bold">
-                              {user.activities.length} atividade
-                              {user.activities.length > 1 ? "s" : ""}
-                            </p>
-                            <p className="text-xs">
-                              {user.consectutiveDays} Dias únicos
-                            </p>
-                            <p className="text-xs">
-                              {user.totalDuration} minutos
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                  {weeklyRanking[weekKey].map((user, index) => (
+                    <WeekUserRankTile
+                      key={user.account.id}
+                      {...{ user, index }}
+                    />
+                  ))}
                 </div>
-                {/* <div className="flex flex-col gap-5 mt-4">
-                    {orderedUsersByActivitiesNumber.map(
-                      ({ account, activities }) => {
-                        return (
-                          <div key={account.id} className="">
-                            <h3 className=" font-bold">
-                              {account.full_name} - {activities.length} ponto
-                              {activities.length > 1 ? "s" : ""}
-                            </h3>
-                            <ol className="flex flex-col gap-2 mt-2 list-decimal">
-                              {activities.reverse().map((activity) => (
-                                <li className="flex-1" key={activity.id}>
-                                  {activity.title}
-                                </li>
-                              ))}
-                            </ol>
-                          </div>
-                        );
-                      }
-                    )}
-                  </div> */}
               </div>
             );
           })}
