@@ -11,6 +11,20 @@ interface UserActivities {
   activities: Activity[];
 }
 
+interface RankedUser {
+  account: Account;
+  points: number;
+  consectutiveDays: number;
+  totalDuration: number;
+}
+
+interface WeeklyRankedUser {
+  account: Account;
+  activities: Activity[];
+  consectutiveDays: number;
+  totalDuration: number;
+}
+
 async function getData() {
   const challengId = process.env.CHALLENGE_ID;
   const token = process.env.TOKEN;
@@ -42,11 +56,126 @@ async function getData() {
   return data.data;
 }
 
+const UserRankTile = ({ user, index }: { user: RankedUser; index: number }) => {
+  const isWinner = index === 0;
+
+  return (
+    <div
+      key={user.account.id}
+      className="grid grid-cols-[30px_1fr] items-center gap-2"
+    >
+      <p className={twMerge(["font-bold", isWinner ? "text-xl" : "text-base"])}>
+        {index + 1} -{" "}
+      </p>
+      <div key={user.account.id} className="flex gap-2 items-center">
+        <Image
+          className={twMerge([
+            "object-cover rounded-full bg-black",
+            isWinner ? "w-[80px] h-[80px]" : "w-[60px] h-[60px]",
+          ])}
+          src={
+            user.account.profile_picture_url ??
+            "https://t4.ftcdn.net/jpg/04/70/29/97/360_F_470299797_UD0eoVMMSUbHCcNJCdv2t8B2g1GVqYgs.jpg"
+          }
+          alt="Profile picture"
+          width={isWinner ? 80 : 60}
+          height={isWinner ? 80 : 60}
+        />
+        <div>
+          <p className="font-bold text-xl">{user.account.full_name}</p>
+          <p className="font-bold text-lg">{user.points} Pontos</p>
+          <p className="text-xs">{user.consectutiveDays} Dias únicos</p>
+          <p className="text-xs">{user.totalDuration} minutos</p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export default async function Home() {
   const data = await getData();
 
   if (!data.length) {
     return <Error />;
+  }
+
+  function getConsecutiveDays(activities: Activity[]) {
+    let days = 0;
+
+    let previousDay: number;
+    activities.forEach((activity) => {
+      const currentDay = moment(activity.occurred_at).day();
+      if (currentDay !== previousDay) {
+        days += 1;
+        previousDay = currentDay;
+      }
+    });
+
+    return days;
+  }
+
+  function getAllActivitiesDuration(activities: Activity[]) {
+    const duration = activities.reduce((acc, activity) => {
+      acc += activity.duration;
+
+      return acc;
+    }, 0);
+
+    return duration;
+  }
+
+  function orderWeeklyRanking(a: WeeklyRankedUser, b: WeeklyRankedUser) {
+    if (a.activities.length > b.activities.length) {
+      return -1;
+    }
+    if (a.activities.length < b.activities.length) {
+      return 1;
+    }
+
+    // consectutive days
+    if (a.consectutiveDays > b.consectutiveDays) {
+      return -1;
+    }
+    if (a.consectutiveDays < b.consectutiveDays) {
+      return 1;
+    }
+
+    // duration
+    if (a.totalDuration > b.totalDuration) {
+      return -1;
+    }
+    if (a.totalDuration < b.totalDuration) {
+      return 1;
+    }
+
+    return 0;
+  }
+
+  function orderRanking(a: RankedUser, b: RankedUser) {
+    if (a.points > b.points) {
+      return -1;
+    }
+    if (a.points < b.points) {
+      return 1;
+    }
+
+    // consectutive days
+    if (a.consectutiveDays > b.consectutiveDays) {
+      return -1;
+    }
+    if (a.consectutiveDays < b.consectutiveDays) {
+      return 1;
+    }
+
+    // duration
+    if (a.totalDuration > b.totalDuration) {
+      return -1;
+    }
+    if (a.totalDuration < b.totalDuration) {
+      return 1;
+    }
+
+    return 0;
   }
 
   function groupByWeek(items: Activity[]) {
@@ -106,65 +235,74 @@ export default async function Home() {
     return weeksActivitiesByUser;
   }
 
-  const weeks = groupByWeek(data);
-  const weeksActivitiesByUser = groupWeeksActivitiesByUser(weeks);
-
-  const weeklyRanking = Object.keys(weeksActivitiesByUser).reduce(
-    (
-      weeksAcc: {
-        [key: string]: UserActivities[];
-      },
-      key
-    ) => {
-      const week = weeksActivitiesByUser[key];
-      const users = Object.keys(week).reduce(
-        (acc: UserActivities[], userId: string) => {
-          acc.push(week[userId]);
-
-          return acc;
+  function getWeeklyRanking(weeksActivities: {
+    [key: string]: {
+      [key: string]: UserActivities;
+    };
+  }) {
+    return Object.keys(weeksActivities).reduce(
+      (
+        weeksAcc: {
+          [key: string]: WeeklyRankedUser[];
         },
-        []
-      );
+        key
+      ) => {
+        const week = weeksActivities[key];
+        const users = Object.keys(week).reduce(
+          (acc: WeeklyRankedUser[], userId: string) => {
+            const user = week[userId];
+            const rankedUser: WeeklyRankedUser = {
+              ...user,
+              consectutiveDays: getConsecutiveDays(user.activities),
+              totalDuration: getAllActivitiesDuration(user.activities),
+            };
+            acc.push(rankedUser);
 
-      const orderedUsersByActivitiesNumber = users.sort((a, b) => {
-        if (a.activities.length > b.activities.length) {
-          return -1;
-        }
-        if (a.activities.length < b.activities.length) {
-          return 1;
-        }
-        return 0;
-      });
+            return acc;
+          },
+          []
+        );
 
-      weeksAcc[key] = orderedUsersByActivitiesNumber;
+        const orderedUsersByActivitiesNumber = users.sort(orderWeeklyRanking);
 
-      return weeksAcc;
-    },
-    {}
-  );
+        weeksAcc[key] = orderedUsersByActivitiesNumber;
 
-  function getOverallUsersPoints(rankingByWeek: typeof weeklyRanking) {
+        return weeksAcc;
+      },
+      {}
+    );
+  }
+
+  function getOverallUsersPoints(
+    rankingByWeek: typeof weeklyRanking,
+    top: number = 3
+  ) {
     const points: {
-      [key: string]: {
-        account: Account;
-        points: number;
-      };
+      [key: string]: RankedUser;
     } = {};
 
     Object.values(rankingByWeek).forEach((week) => {
-      week.forEach((userActivities, index) => {
-        // // only the first 3 makes points
-        const potuation = 3 - index >= 0 ? 3 - index : 0;
+      week.forEach(({ account, activities }, index) => {
+        // // only the first TOP makes points
+        const potuation = top - index >= 0 ? top - index : 0;
+        const consectutiveDays = getConsecutiveDays(activities);
+        const allActivitiesDuration = getAllActivitiesDuration(activities);
 
-        if (points[userActivities.account.id]) {
-          points[userActivities.account.id] = {
-            ...points[userActivities.account.id],
-            points: points[userActivities.account.id].points + potuation,
+        if (points[account.id]) {
+          points[account.id] = {
+            ...points[account.id],
+            points: points[account.id].points + potuation,
+            consectutiveDays:
+              points[account.id].consectutiveDays + consectutiveDays,
+            totalDuration:
+              points[account.id].totalDuration + allActivitiesDuration,
           };
         } else {
-          points[userActivities.account.id] = {
-            account: userActivities.account,
+          points[account.id] = {
+            account: account,
             points: potuation,
+            consectutiveDays: consectutiveDays,
+            totalDuration: allActivitiesDuration,
           };
         }
       });
@@ -173,58 +311,58 @@ export default async function Home() {
     return points;
   }
 
-  const overallUsersPoints = getOverallUsersPoints(weeklyRanking);
-  const usersRankedByPoints = Object.values(overallUsersPoints).sort((a, b) => {
-    if (a.points > b.points) {
-      return -1;
-    }
-    if (a.points < b.points) {
-      return 1;
-    }
-    return 0;
-  });
+  const weeks = groupByWeek(data);
+  const weeksActivitiesByUser = groupWeeksActivitiesByUser(weeks);
+
+  const weeklyRanking = getWeeklyRanking(weeksActivitiesByUser);
 
   return (
     <main className="p-10">
-      <h2 className="text-2xl font-bold text-center">Ranking Geral</h2>
-      <div className="flex flex-col gap-2 max-w-sm mx-auto mt-5">
-        {usersRankedByPoints.map((user, index) => {
-          const isWinner = index === 0;
-
-          return (
-            <div key={user.account.id} className="flex items-center gap-2">
-              <p
-                className={twMerge([
-                  "font-bold",
-                  isWinner ? "text-xl" : "text-base",
-                ])}
-              >
-                {index + 1} -{" "}
-              </p>
-              <div key={user.account.id} className="flex gap-2 items-center">
-                <Image
-                  className={twMerge([
-                    "object-cover rounded-full bg-black",
-                    isWinner ? "w-[80px] h-[80px]" : "w-[60px] h-[60px]",
-                  ])}
-                  src={
-                    user.account.profile_picture_url ??
-                    "https://t4.ftcdn.net/jpg/04/70/29/97/360_F_470299797_UD0eoVMMSUbHCcNJCdv2t8B2g1GVqYgs.jpg"
-                  }
-                  alt="Profile picture"
-                  width={isWinner ? 80 : 60}
-                  height={isWinner ? 80 : 60}
-                />
-                <div>
-                  <p className="font-bold text-xl">{user.account.full_name}</p>
-                  <p className="font-bold">{user.points} Pontos</p>
-                </div>
-              </div>
-            </div>
-          );
-        })}
+      <div className="grid grid-cols-1 md:grid-cols-3 justify-center gap-y-10 gap-x-10">
+        <div>
+          <h2 className="text-2xl font-bold text-center">
+            Ranking Geral - Top 3 pontuam
+          </h2>
+          <div className="flex flex-col gap-2 max-w-sm mx-auto mt-5">
+            {Object.values(getOverallUsersPoints(weeklyRanking))
+              .sort(orderRanking)
+              .map((user, index) => {
+                return (
+                  <UserRankTile key={user.account.id} {...{ user, index }} />
+                );
+              })}
+          </div>
+        </div>
+        <div>
+          <h2 className="text-2xl font-bold text-center">
+            Ranking Geral - Top 4 pontuam
+          </h2>
+          <div className="flex flex-col gap-2 max-w-sm mx-auto mt-5">
+            {Object.values(getOverallUsersPoints(weeklyRanking, 4))
+              .sort(orderRanking)
+              .map((user, index) => {
+                return (
+                  <UserRankTile key={user.account.id} {...{ user, index }} />
+                );
+              })}
+          </div>
+        </div>
+        <div>
+          <h2 className="text-2xl font-bold text-center">
+            Ranking Geral - Top 5 pontuam
+          </h2>
+          <div className="flex flex-col gap-2 max-w-sm mx-auto mt-5">
+            {Object.values(getOverallUsersPoints(weeklyRanking, 5))
+              .sort(orderRanking)
+              .map((user, index) => {
+                return (
+                  <UserRankTile key={user.account.id} {...{ user, index }} />
+                );
+              })}
+          </div>
+        </div>
       </div>
-      <h2 className="text-2xl font-bold mt-5">Ranking Semanal</h2>
+      <h2 className="text-4xl font-bold mt-10">Ranking Semanal</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-10 mt-5">
         {Object.keys(weeksActivitiesByUser)
           .reverse()
@@ -278,6 +416,12 @@ export default async function Home() {
                             <p className="font-bold">
                               {user.activities.length} atividade
                               {user.activities.length > 1 ? "s" : ""}
+                            </p>
+                            <p className="text-xs">
+                              {user.consectutiveDays} Dias únicos
+                            </p>
+                            <p className="text-xs">
+                              {user.totalDuration} minutos
                             </p>
                           </div>
                         </div>
